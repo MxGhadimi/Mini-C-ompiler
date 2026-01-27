@@ -36,7 +36,6 @@
 %token LBRACKET RBRACKET
 %token SEMICOLON COMMA COLON
 
-
 %right ASSIGN
 %left OR
 %left AND
@@ -62,27 +61,26 @@ external_declaration
     | global_declaration
     ;
 
-// FUNCTION DEFINITIONS
+/* FUNCTION DEFINITIONS */
 function_definition
-    : type_specifier MAIN LPAREN param_list_opt RPAREN compound_stmt
-    | type_specifier IDENTIFIER LPAREN param_list_opt RPAREN compound_stmt
+    : type_specifier MAIN LPAREN optional_parameter_list RPAREN compound_statement
+    | type_specifier IDENTIFIER LPAREN optional_parameter_list RPAREN compound_statement
     ;
 
-param_list_opt
-    : param_list
+optional_parameter_list
+    : parameter_list
     |
     ;
 
-param_list
-    : param
-    | param_list COMMA param
+parameter_list
+    : parameter_declaration
+    | parameter_list COMMA parameter_declaration
     ;
 
-param
+parameter_declaration
     : type_specifier IDENTIFIER
     | type_specifier IDENTIFIER LBRACKET RBRACKET // array parameters 
     ;
-
 
 /* TYPE SPECIFIERS */
 type_specifier
@@ -92,9 +90,8 @@ type_specifier
     | VOID
     ;
 
-
 /* COMPOUND STATEMENT */
-compound_stmt
+compound_statement
     : LBRACE RBRACE
     | LBRACE block_list RBRACE
     ;
@@ -106,9 +103,8 @@ block_list
 
 block_item
     : local_declaration
-    | stmt
+    | statement
     ;
-
 
 /* DECLARATIONS */
 global_declaration
@@ -134,7 +130,7 @@ declarator
     ;
 
 initializer
-    : assignment_expr
+    : assignment_expression
     ;
 
 array_initializer
@@ -148,72 +144,71 @@ initializer_list
     ;
 
 /* STATEMENTS */
-stmt
-    : matched_stmt
-    | unmatched_stmt
+statement
+    : matched_statement
+    | unmatched_statement
     ;
 
-matched_stmt
-    : IF LPAREN expr RPAREN matched_stmt ELSE matched_stmt
-    | compound_stmt
-    | expression_stmt
-    | iteration_matched
-    | jump_stmt
-    | switch_stmt
+matched_statement
+    : IF LPAREN expression RPAREN matched_statement ELSE matched_statement
+    | compound_statement
+    | expression_statement
+    | matched_iteration_statement
+    | jump_statement
+    | switch_statement
     ;
 
-expression_stmt
+expression_statement
     : SEMICOLON
-    | expr SEMICOLON
+    | expression SEMICOLON
     ;
 
-unmatched_stmt
-    : IF LPAREN expr RPAREN stmt
-    | IF LPAREN expr RPAREN matched_stmt ELSE unmatched_stmt
-    | iteration_unmatched
+unmatched_statement
+    : IF LPAREN expression RPAREN statement
+    | IF LPAREN expression RPAREN matched_statement ELSE unmatched_statement
+    | unmatched_iteration_statement
     ;
 
-iteration_matched
-    : WHILE LPAREN expr RPAREN matched_stmt
-    | DO stmt WHILE LPAREN expr RPAREN SEMICOLON
-    | FOR LPAREN for_init_opt SEMICOLON for_cond_opt SEMICOLON for_update_opt RPAREN matched_stmt
+matched_iteration_statement
+    : WHILE LPAREN expression RPAREN matched_statement
+    | DO statement WHILE LPAREN expression RPAREN SEMICOLON
+    | FOR LPAREN optional_for_initialization SEMICOLON optional_for_condition SEMICOLON optional_for_update RPAREN matched_statement
     ;
 
-iteration_unmatched
-    : WHILE LPAREN expr RPAREN unmatched_stmt
-    | FOR LPAREN for_init_opt SEMICOLON for_cond_opt SEMICOLON for_update_opt RPAREN unmatched_stmt
+unmatched_iteration_statement
+    : WHILE LPAREN expression RPAREN unmatched_statement
+    | FOR LPAREN optional_for_initialization SEMICOLON optional_for_condition SEMICOLON optional_for_update RPAREN unmatched_statement
     ;
 
-for_init_opt
-    : for_init
+optional_for_initialization
+    : for_initialization
     |
     ;
 
-for_init
-    : type_specifier IDENTIFIER ASSIGN assignment_expr
-    | assignment_expr
+for_initialization
+    : type_specifier IDENTIFIER ASSIGN assignment_expression
+    | assignment_expression
     ;
 
-for_cond_opt
-    : expr
+optional_for_condition
+    : expression
     |
     ;
 
-for_update_opt
-    : for_update
+optional_for_update
+    : for_update_expression
     |
     ;
 
-for_update
-    : assignment_expr
-    | for_update COMMA assignment_expr
+for_update_expression
+    : assignment_expression
+    | for_update_expression COMMA assignment_expression
     ;
-
 
 /* SWITCH STATEMENT */
-switch_stmt
-    : SWITCH LPAREN expr RPAREN LBRACE case_list RBRACE
-    | SWITCH LPAREN expr RPAREN LBRACE RBRACE
+switch_statement
+    : SWITCH LPAREN expression RPAREN LBRACE case_list RBRACE
+    | SWITCH LPAREN expression RPAREN LBRACE RBRACE
     ;
 
 case_list
@@ -222,108 +217,106 @@ case_list
     ;
 
 case_clause
-    : CASE constant_expr COLON stmt_list_opt
-    | DEFAULT COLON stmt_list_opt
+    : CASE constant_expression COLON optional_statement_sequence
+    | DEFAULT COLON optional_statement_sequence
     ;
 
-stmt_list_opt
+optional_statement_sequence
     : block_list
     |
     ;
 
-constant_expr
+constant_expression
     : INTEGER_LITERAL
     | CHAR_LITERAL
     | MINUS INTEGER_LITERAL %prec UMINUS
     ;
 
-
-/* JUMP STATEMENTS   */
-jump_stmt
+/* JUMP STATEMENTS */
+jump_statement
     : RETURN SEMICOLON
-    | RETURN expr SEMICOLON
+    | RETURN expression SEMICOLON
     | BREAK SEMICOLON
     | CONTINUE SEMICOLON
     ;
 
-
 /* EXPRESSIONS */
-expr
-    : assignment_expr
-    | expr COMMA assignment_expr
+expression
+    : assignment_expression
+    | expression COMMA assignment_expression
     ;
 
-assignment_expr
-    : logical_or_expr
-    | logical_or_expr ASSIGN assignment_expr
+assignment_expression
+    : logical_or_expression
+    | logical_or_expression ASSIGN assignment_expression
     ;
 
-logical_or_expr
-    : logical_and_expr
-    | logical_or_expr OR logical_and_expr
+logical_or_expression
+    : logical_and_expression
+    | logical_or_expression OR logical_and_expression
     ;
 
-logical_and_expr
-    : equality_expr
-    | logical_and_expr AND equality_expr
+logical_and_expression
+    : equality_expression
+    | logical_and_expression AND equality_expression
     ;
 
-equality_expr
-    : relational_expr
-    | equality_expr EQ relational_expr
-    | equality_expr NE relational_expr
+equality_expression
+    : relational_expression
+    | equality_expression EQ relational_expression
+    | equality_expression NE relational_expression
     ;
 
-relational_expr
-    : additive_expr
-    | relational_expr LT additive_expr
-    | relational_expr GT additive_expr
-    | relational_expr LE additive_expr
-    | relational_expr GE additive_expr
+relational_expression
+    : additive_expression
+    | relational_expression LT additive_expression
+    | relational_expression GT additive_expression
+    | relational_expression LE additive_expression
+    | relational_expression GE additive_expression
     ;
 
-additive_expr
-    : multiplicative_expr
-    | additive_expr PLUS multiplicative_expr
-    | additive_expr MINUS multiplicative_expr
+additive_expression
+    : multiplicative_expression
+    | additive_expression PLUS multiplicative_expression
+    | additive_expression MINUS multiplicative_expression
     ;
 
-multiplicative_expr
-    : unary_expr
-    | multiplicative_expr MULT unary_expr
-    | multiplicative_expr DIV unary_expr
-    | multiplicative_expr MOD unary_expr
+multiplicative_expression
+    : unary_expression
+    | multiplicative_expression MULT unary_expression
+    | multiplicative_expression DIV unary_expression
+    | multiplicative_expression MOD unary_expression
     ;
 
-unary_expr
-    : postfix_expr
-    | INC unary_expr
-    | DEC unary_expr
-    | MINUS unary_expr %prec UMINUS
-    | NOT unary_expr
+unary_expression
+    : postfix_expression
+    | INC unary_expression
+    | DEC unary_expression
+    | MINUS unary_expression %prec UMINUS
+    | NOT unary_expression
     ;
 
-postfix_expr
-    : primary_expr
-    | postfix_expr LBRACKET expr RBRACKET
-    | postfix_expr LPAREN RPAREN
-    | postfix_expr LPAREN argument_list RPAREN
-    | postfix_expr INC
-    | postfix_expr DEC
+postfix_expression
+    : primary_expression
+    | postfix_expression LBRACKET expression RBRACKET
+    | postfix_expression LPAREN RPAREN
+    | postfix_expression LPAREN argument_expression_list RPAREN
+    | postfix_expression INC
+    | postfix_expression DEC
     ;
 
-primary_expr
+primary_expression
     : IDENTIFIER
     | INTEGER_LITERAL
     | FLOAT_LITERAL
     | CHAR_LITERAL
     | STRING_LITERAL
-    | LPAREN expr RPAREN
+    | LPAREN expression RPAREN
     ;
 
-argument_list
-    : assignment_expr
-    | argument_list COMMA assignment_expr
+argument_expression_list
+    : assignment_expression
+    | argument_expression_list COMMA assignment_expression
     ;
 
 %%
