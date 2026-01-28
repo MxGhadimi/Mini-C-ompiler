@@ -4,6 +4,19 @@
 #include <string.h>
 #include <ctype.h>
 #include "tree.h"
+
+extern FILE *token_file;
+extern int line_counter;
+extern int column_counter;
+
+int readNextToken(void);
+void initializeTokenFile(const char* filename);
+void closeTokenFile(void);
+
+char current_token_type[64];
+char current_token_value[256];
+int current_token_line;
+int current_token_column;
 %}
 
 /* literals */
@@ -320,3 +333,176 @@ argument_expression_list
     ;
 
 %%
+
+/* TOKEN READING FUNCTIONS */
+int readNextToken(void) {
+    char line[512];
+    
+    if (!token_file) return 0;
+    
+    while (fgets(line, sizeof(line), token_file) != NULL) {
+        /* Skip header lines */
+        if (strstr(line, "TOKEN LIST") != NULL ||
+            strstr(line, "TOKEN TYPE") != NULL ||
+            strstr(line, "----------") != NULL ||
+            strstr(line, "Total tokens") != NULL) {
+            continue;
+        }
+        
+        if (strlen(line) < 5) continue;
+        
+        /* Parse the line */
+        char type[64], value[256];
+        int line_num, col_num;
+        
+        if (sscanf(line, "%63s %255s Line: %d, Col: %d",
+                   type, value, &line_num, &col_num) >= 2) {
+            
+            /* Skip ERROR tokens */
+            if (strcmp(type, "ERROR") == 0) {
+                fprintf(stderr, "Skipping lexical error: %s\n", value);
+                continue;
+            }
+            
+            strcpy(current_token_type, type);
+            strcpy(current_token_value, value);
+            current_token_line = line_num;
+            current_token_column = col_num;
+            line_counter = line_num;
+            column_counter = col_num;
+            
+            return 1;
+        }
+    }
+    
+    return 0;
+}
+
+int yylex(void) {
+    if (!readNextToken()) {
+        return 0; /* EOF */
+    }
+    
+    /* KEYWORDS */
+    if (strcmp(current_token_type, "KEYWORD") == 0) {
+        if (strcmp(current_token_value, "main") == 0) return MAIN;
+        if (strcmp(current_token_value, "if") == 0) return IF;
+        if (strcmp(current_token_value, "else") == 0) return ELSE;
+        if (strcmp(current_token_value, "for") == 0) return FOR;
+        if (strcmp(current_token_value, "while") == 0) return WHILE;
+        if (strcmp(current_token_value, "do") == 0) return DO;
+        if (strcmp(current_token_value, "switch") == 0) return SWITCH;
+        if (strcmp(current_token_value, "case") == 0) return CASE;
+        if (strcmp(current_token_value, "default") == 0) return DEFAULT;
+        if (strcmp(current_token_value, "break") == 0) return BREAK;
+        if (strcmp(current_token_value, "continue") == 0) return CONTINUE;
+        if (strcmp(current_token_value, "return") == 0) return RETURN;
+        if (strcmp(current_token_value, "int") == 0) return INT;
+        if (strcmp(current_token_value, "float") == 0) return FLOAT;
+        if (strcmp(current_token_value, "char") == 0) return CHAR;
+        if (strcmp(current_token_value, "void") == 0) return VOID;
+        if (strcmp(current_token_value, "const") == 0) return CONST;
+    }
+    
+    /* IDENTIFIER */
+    if (strcmp(current_token_type, "IDENTIFIER") == 0) {
+        yylval.sval = strdup(current_token_value);
+        return IDENTIFIER;
+    }
+    
+    /* INTEGER */
+    if (strcmp(current_token_type, "INTEGER") == 0) {
+        yylval.sval = strdup(current_token_value);
+        return INTEGER_LITERAL;
+    }
+    
+    /* FLOAT */
+    if (strcmp(current_token_type, "FLOAT") == 0) {
+        yylval.sval = strdup(current_token_value);
+        return FLOAT_LITERAL;
+    }
+    
+    /* CHAR */
+    if (strcmp(current_token_type, "CHAR") == 0) {
+        yylval.sval = strdup(current_token_value);
+        return CHAR_LITERAL;
+    }
+    
+    /* STRING */
+    if (strcmp(current_token_type, "STRING") == 0) {
+        yylval.sval = strdup(current_token_value);
+        return STRING_LITERAL;
+    }
+    
+    /* OPERATORS */
+    if (strcmp(current_token_type, "OPERATOR") == 0) {
+        if (strcmp(current_token_value, "+") == 0) return PLUS;
+        if (strcmp(current_token_value, "-") == 0) return MINUS;
+        if (strcmp(current_token_value, "*") == 0) return MULT;
+        if (strcmp(current_token_value, "/") == 0) return DIV;
+        if (strcmp(current_token_value, "%") == 0) return MOD;
+        if (strcmp(current_token_value, "++") == 0) return INC;
+        if (strcmp(current_token_value, "--") == 0) return DEC;
+        if (strcmp(current_token_value, "=") == 0) return ASSIGN;
+        if (strcmp(current_token_value, "==") == 0) return EQ;
+        if (strcmp(current_token_value, "!=") == 0) return NE;
+        if (strcmp(current_token_value, "<") == 0) return LT;
+        if (strcmp(current_token_value, ">") == 0) return GT;
+        if (strcmp(current_token_value, "<=") == 0) return LE;
+        if (strcmp(current_token_value, ">=") == 0) return GE;
+        if (strcmp(current_token_value, "&&") == 0) return AND;
+        if (strcmp(current_token_value, "||") == 0) return OR;
+        if (strcmp(current_token_value, "!") == 0) return NOT;
+    }
+    
+    /* PUNCTUATORS */
+    if (strcmp(current_token_type, "PUNCTUATOR") == 0) {
+        if (strcmp(current_token_value, "(") == 0) return LPAREN;
+        if (strcmp(current_token_value, ")") == 0) return RPAREN;
+        if (strcmp(current_token_value, "{") == 0) return LBRACE;
+        if (strcmp(current_token_value, "}") == 0) return RBRACE;
+        if (strcmp(current_token_value, "[") == 0) return LBRACKET;
+        if (strcmp(current_token_value, "]") == 0) return RBRACKET;
+        if (strcmp(current_token_value, ";") == 0) return SEMICOLON;
+        if (strcmp(current_token_value, ",") == 0) return COMMA;
+        if (strcmp(current_token_value, ":") == 0) return COLON;
+    }
+    
+    fprintf(stderr, "Unknown token: %s '%s' at line %d\n",
+            current_token_type, current_token_value, current_token_line);
+    return 0;
+}
+
+void yyerror(const char *s) {
+    fprintf(stderr, "Syntax Error at line %d, col %d: %s\n",
+            line_counter, column_counter, s);
+    fprintf(stderr, "  Current token: %s '%s'\n", 
+            current_token_type, current_token_value);
+}
+
+int main(int argc, char *argv[]) {
+    if (argc != 2) {
+        fprintf(stderr, "Usage: %s <tokens_file>\n", argv[0]);
+        return 1;
+    }
+    
+    token_file = fopen(argv[1], "r");
+    if (!token_file) {
+        fprintf(stderr, "Cannot open token file: %s\n", argv[1]);
+        return 1;
+    }
+    
+    printf("Parsing tokens from: %s\n", argv[1]);
+    
+    int result = yyparse();
+    
+    fclose(token_file);
+    
+    if (result == 0) {
+        printf("Parsing successful!\n");
+    } else {
+        printf("Parsing failed!\n");
+    }
+    
+    return result;
+}
